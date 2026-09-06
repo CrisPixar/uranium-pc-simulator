@@ -82,14 +82,14 @@ jobs:
           c12 = so32[0x58bb48:0x58bb48+4] == bytes.fromhex('1c0094e5') # FIX1a: ldr r0,[r4,#0x1c]
           print('OK   v4 arm32 неверный-размер (fileNameText)' if c12 else 'FAIL v4 arm32 FIX1a'); ok = ok and c12
           c13 = so64[0x867384:0x867384+4] == bytes.fromhex('1fdaff17')   # v7 cave2: выбор рамки по ширине
-print('OK   v7 arm64 cave2' if c13 else 'FAIL v7 arm64 cave2'); ok = ok and c13
-c14 = so64[0x85dae0+56:0x85dae0+60] == bytes.fromhex('0a791f53')   # v7 sup: lsl w10,w8,#1 (2sw==w — кратность в обе стороны)
-print('OK   v7 arm64 sup-обратные' if c14 else 'FAIL v7 arm64 sup-обратные'); ok = ok and c14
-c15 = so32[0x58b9b8:0x58b9bc] == bytes.fromhex('307a5bea')   # v7 cave2-32
-print('OK   v7 arm32 cave2' if c15 else 'FAIL v7 arm32 cave2'); ok = ok and c15
-c16 = so32[0x1c6a180+0x3c:0x1c6a180+0x40] == bytes.fromhex('8120a0e1')   # v7 sup32: lsl r2,r1,#1
-print('OK   v7 arm32 sup-обратные' if c16 else 'FAIL v7 arm32 sup-обратные'); ok = ok and c16
-print('записей в APK:', len(z.namelist()))
+          print('OK   v7 arm64 cave2' if c13 else 'FAIL v7 arm64 cave2'); ok = ok and c13
+          c14 = so64[0x85dae0+56:0x85dae0+60] == bytes.fromhex('0a791f53')   # v7 sup: lsl w10,w8,#1 (2sw==w — кратность в обе стороны)
+          print('OK   v7 arm64 sup-обратные' if c14 else 'FAIL v7 arm64 sup-обратные'); ok = ok and c14
+          c15 = so32[0x58b9b8:0x58b9bc] == bytes.fromhex('307a5bea')   # v7 cave2-32
+          print('OK   v7 arm32 cave2' if c15 else 'FAIL v7 arm32 cave2'); ok = ok and c15
+          c16 = so32[0x1c6a180+0x3c:0x1c6a180+0x40] == bytes.fromhex('8120a0e1')   # v7 sup32: lsl r2,r1,#1
+          print('OK   v7 arm32 sup-обратные' if c16 else 'FAIL v7 arm32 sup-обратные'); ok = ok and c16
+          print('записей в APK:', len(z.namelist()))
           sys.exit(0 if ok else 1)
           PYEOF
 
