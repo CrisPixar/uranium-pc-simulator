@@ -62,10 +62,10 @@ jobs:
           print('OK   v3 arm64 BTC-кейв' if c2 else 'FAIL v3 arm64 BTC-кейв'); ok = ok and c2
           c3 = so32[0x53bad0:0x53bad0+4] == bytes.fromhex('6ab95cea')   # b 0x1c6a080 (BTC-кейв)
           print('OK   v3 arm32 BTC-кейв' if c3 else 'FAIL v3 arm32 BTC-кейв'); ok = ok and c3
-          c4 = so64[0x867394:0x867394+4] == bytes.fromhex('3701261e')   # v3 fmov w23,s9 (спавн по ширине, откат v4)
-          print('OK   arm64 спавн-блок = v3 (откат)' if c4 else 'FAIL arm64 спавн-блок'); ok = ok and c4
-          c5 = so32[0x58b9b4:0x58b9b4+4] == bytes.fromhex('100a18ee')   # v3 vmov r0,s16
-          print('OK   arm32 спавн-блок = v3 (откат)' if c5 else 'FAIL arm32 спавн-блок'); ok = ok and c5
+          c4 = so64[0x867394:0x867394+4] == bytes.fromhex('210340f9')   # v7: B2 = ОРИГИНАЛ (ldr x1,[x25])
+          print('OK   arm64 B2 = оригинал (v7)' if c4 else 'FAIL arm64 B2'); ok = ok and c4
+          c5 = so32[0x58b9b4:0x58b9b4+4] == bytes.fromhex('000097e5')   # v7: B2 = ОРИГИНАЛ (ldr r0,[r7])
+          print('OK   arm32 B2 = оригинал (v7)' if c5 else 'FAIL arm32 B2'); ok = ok and c5
           # --- v4: фикс краша (без FadeText), Supports-универсал, selectedFile-слот ---
           c6 = so64[0x8674dc:0x8674dc+4] == bytes.fromhex('60003fd6')   # blr x3 (fileNameText.set_text)
           print('OK   v4 arm64 FIX краша (blr)' if c6 else 'FAIL v4 arm64 FIX краша'); ok = ok and c6
@@ -81,7 +81,15 @@ jobs:
           print('OK   v4 arm64 не-хватает-денег (без FadeText)' if c11 else 'FAIL v4 arm64 FIX1b'); ok = ok and c11
           c12 = so32[0x58bb48:0x58bb48+4] == bytes.fromhex('1c0094e5') # FIX1a: ldr r0,[r4,#0x1c]
           print('OK   v4 arm32 неверный-размер (fileNameText)' if c12 else 'FAIL v4 arm32 FIX1a'); ok = ok and c12
-          print('записей в APK:', len(z.namelist()))
+          c13 = so64[0x867384:0x867384+4] == bytes.fromhex('1fdaff17')   # v7 cave2: выбор рамки по ширине
+print('OK   v7 arm64 cave2' if c13 else 'FAIL v7 arm64 cave2'); ok = ok and c13
+c14 = so64[0x85dae0+56:0x85dae0+60] == bytes.fromhex('0a791f53')   # v7 sup: lsl w10,w8,#1 (2sw==w — кратность в обе стороны)
+print('OK   v7 arm64 sup-обратные' if c14 else 'FAIL v7 arm64 sup-обратные'); ok = ok and c14
+c15 = so32[0x58b9b8:0x58b9bc] == bytes.fromhex('307a5bea')   # v7 cave2-32
+print('OK   v7 arm32 cave2' if c15 else 'FAIL v7 arm32 cave2'); ok = ok and c15
+c16 = so32[0x1c6a180+0x3c:0x1c6a180+0x40] == bytes.fromhex('8120a0e1')   # v7 sup32: lsl r2,r1,#1
+print('OK   v7 arm32 sup-обратные' if c16 else 'FAIL v7 arm32 sup-обратные'); ok = ok and c16
+print('записей в APK:', len(z.namelist()))
           sys.exit(0 if ok else 1)
           PYEOF
 
@@ -112,7 +120,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.9.1.11-uranium.b${GITHUB_RUN_NUMBER}"
+          # run 9 упал на устаревших сигнатурах (релиз не создался) — этот релиз = b9
+          TAG="v1.9.1.11-uranium.b9"
           DATE=$(date +'%Y.%m.%d-%H%M')
           NOTES="Мод Blue PC Simulator: Uranium PC Simulator. Сборка $DATE.
 
