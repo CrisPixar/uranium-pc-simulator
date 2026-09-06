@@ -29,6 +29,31 @@ jobs:
         run: |
           java -jar /tmp/apktool.jar b . -o UraniumPCSimulator-unsigned.apk
 
+      - name: Проверка содержимого APK (хэши и манифест)
+        run: |
+          python3 - <<'PYEOF'
+          import zipfile, hashlib, sys
+          z = zipfile.ZipFile('UraniumPCSimulator-unsigned.apk')
+          def h(b): return hashlib.sha256(b).hexdigest()[:16]
+          ok = True
+          for ap, sp in [
+              ('assets/bin/Data/data.unity3d', 'assets/bin/Data/data.unity3d'),
+              ('lib/arm64-v8a/libil2cpp.so', 'lib/arm64-v8a/libil2cpp.so'),
+              ('lib/armeabi-v7a/libil2cpp.so', 'lib/armeabi-v7a/libil2cpp.so'),
+              ('classes.dex', 'classes.dex'),
+          ]:
+              a, b = h(z.read(ap)), h(open(sp, 'rb').read())
+              print(('OK  ' if a == b else 'FAIL'), ap)
+              ok = ok and a == b
+          mf = z.read('AndroidManifest.xml')
+          pkg = 'com.UraniumPCS.UraniumPCSimulator'.encode('utf-16-le') in mf
+          print('OK   пакет' if pkg else 'FAIL пакет'); ok = ok and pkg
+          name = b'Uranium PC Simulator' in z.read('resources.arsc')
+          print('OK   app_name' if name else 'FAIL app_name'); ok = ok and name
+          print('записей в APK:', len(z.namelist()))
+          sys.exit(0 if ok else 1)
+          PYEOF
+
       - name: ZipAlign + Sign (apksigner, v1+v2+v3)
         env:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
