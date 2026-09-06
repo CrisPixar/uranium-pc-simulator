@@ -62,10 +62,25 @@ jobs:
           print('OK   v3 arm64 BTC-кейв' if c2 else 'FAIL v3 arm64 BTC-кейв'); ok = ok and c2
           c3 = so32[0x53bad0:0x53bad0+4] == bytes.fromhex('6ab95cea')   # b 0x1c6a080 (BTC-кейв)
           print('OK   v3 arm32 BTC-кейв' if c3 else 'FAIL v3 arm32 BTC-кейв'); ok = ok and c3
-          c4 = so64[0x867394:0x867394+4] == bytes.fromhex('3701261e')   # fmov w23, s9 (спавн)
-          print('OK   v3 arm64 спавн-блок' if c4 else 'FAIL v3 arm64 спавн-блок'); ok = ok and c4
-          c5 = so32[0x58b9b4:0x58b9b4+4] == bytes.fromhex('100a18ee')   # vmov r0, s16 (спавн)
-          print('OK   v3 arm32 спавн-блок' if c5 else 'FAIL v3 arm32 спавн-блок'); ok = ok and c5
+          c4 = so64[0x867394:0x867394+4] == bytes.fromhex('771a40f9')   # ldr x23,[x19,#0x30] (v4: всегда bannerPrefab)
+          print('OK   v4 arm64 спавн-блок' if c4 else 'FAIL v4 arm64 спавн-блок'); ok = ok and c4
+          c5 = so32[0x58b9b4:0x58b9b4+4] == bytes.fromhex('189094e5')   # ldr sb,[r4,#0x18] (v4)
+          print('OK   v4 arm32 спавн-блок' if c5 else 'FAIL v4 arm32 спавн-блок'); ok = ok and c5
+          # --- v4: фикс краша (без FadeText), Supports-универсал, selectedFile-слот ---
+          c6 = so64[0x8674dc:0x8674dc+4] == bytes.fromhex('60003fd6')   # blr x3 (fileNameText.set_text)
+          print('OK   v4 arm64 FIX краша (blr)' if c6 else 'FAIL v4 arm64 FIX краша'); ok = ok and c6
+          c7 = so64[0x834ef4:0x834ef4+4] == bytes.fromhex('fba20014')   # b кейв (Supports универсальный)
+          print('OK   v4 arm64 Supports-кейв' if c7 else 'FAIL v4 arm64 Supports-кейв'); ok = ok and c7
+          c8 = so32[0x54aba8:0x54aba8+4] == bytes.fromhex('747d5cea')   # b кейв (Supports универсальный)
+          print('OK   v4 arm32 Supports-кейв' if c8 else 'FAIL v4 arm32 Supports-кейв'); ok = ok and c8
+          c9 = so64[0x8671f8:0x8671f8+4] == bytes.fromhex('50daff17')   # Purchase -> file-кейв
+          print('OK   v4 arm64 file-хук' if c9 else 'FAIL v4 arm64 file-хук'); ok = ok and c9
+          c10 = so32[0x58b7ec:0x58b7ec+4] == bytes.fromhex('7c7a5bea') # Purchase32 -> file-кейв
+          print('OK   v4 arm32 file-хук' if c10 else 'FAIL v4 arm32 file-хук'); ok = ok and c10
+          c11 = so64[0x867540:0x867540+4] == bytes.fromhex('f2ffff17') # FIX1b: b 0x867508 (без FadeText)
+          print('OK   v4 arm64 не-хватает-денег (без FadeText)' if c11 else 'FAIL v4 arm64 FIX1b'); ok = ok and c11
+          c12 = so32[0x58bb48:0x58bb48+4] == bytes.fromhex('1c0094e5') # FIX1a: ldr r0,[r4,#0x1c]
+          print('OK   v4 arm32 неверный-размер (fileNameText)' if c12 else 'FAIL v4 arm32 FIX1a'); ok = ok and c12
           print('записей в APK:', len(z.namelist()))
           sys.exit(0 if ok else 1)
           PYEOF
@@ -101,7 +116,14 @@ jobs:
           DATE=$(date +'%Y.%m.%d-%H%M')
           NOTES="Мод Blue PC Simulator: Uranium PC Simulator. Сборка $DATE.
 
-          Изменения v3:
+          Изменения v4 (b6):
+          - ИСПРАВЛЕН КРАШ сайта PrintExpert при покупке баннера (неверный размер картинки / нехватка денег больше не роняют игру — сообщение выводится в поле имени файла)
+          - Переключатель баннера на сайте PrintExpert: две кнопки — Vertical (32x70) и Horizontal (70x32); вид баннера выбирается кнопкой, размер картинки подходит любой
+          - Универсальный принтер Apson A3 Universal (20000$) в маркете: печатает и 512x512, и 1024x1024; отдельные карточки 512/1024 убраны
+          - Горизонтальный баннер удалён из маркета — покупается только на сайте PrintExpert
+          - Стеклянные панели ATX/ITX: приложите картинку из руки к купленной стеклянной панели, чтобы вставить её в стекло
+
+          Изменения v3 (b5):
           - Заголовок меню больше не возвращается к 'Blue' (патч рантайм-литерала)
           - Принтеры 512/1024 и горизонтальный баннер видны и покупаются в маркете (фикс карточки 'Title')
           - Горизонтальный баннер заказывается на сайте PrintExpert: картинка 70x32 (вертикальный баннер - 32x70, как раньше)
