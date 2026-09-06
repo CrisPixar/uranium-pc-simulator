@@ -1,0 +1,5 @@
+# сборочные артефакты apktool
+build/
+*.apk
+__pycache__/
+*.log

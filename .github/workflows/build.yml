@@ -1,0 +1,61 @@
+name: Build Uranium PC Simulator
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install apktool
+        run: |
+          curl -sL -o /tmp/apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.10.0/apktool_2.10.0.jar
+
+      - name: Build APK (apktool b)
+        run: |
+          java -jar /tmp/apktool.jar b . -o UraniumPCSimulator-unsigned.apk
+
+      - name: ZipAlign + Sign (apksigner, v1+v2+v3)
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: |
+          BT=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -1)
+          echo "build-tools: $BT"
+          "$BT/zipalign" -f -p 4 UraniumPCSimulator-unsigned.apk UraniumPCSimulator-aligned.apk
+          "$BT/apksigner" sign \
+            --ks uranium.jks \
+            --ks-key-alias uranium \
+            --ks-pass pass:***REMOVED-KEYSTORE-PASS*** \
+            --key-pass pass:***REMOVED-KEYSTORE-PASS*** \
+            --out UraniumPCSimulator.apk \
+            UraniumPCSimulator-aligned.apk
+          "$BT/apksigner" verify --print-certs UraniumPCSimulator.apk || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UraniumPCSimulator
+          path: UraniumPCSimulator.apk
+          retention-days: 90
+
+      - name: Create/update release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="v1.9.1.11-uranium"
+          DATE=$(date +'%Y.%m.%d-%H%M')
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 || \
+            gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --title "Uranium PC Simulator $TAG" \
+              --notes "Мод Blue PC Simulator: Uranium PC Simulator. Сборка $DATE." --prerelease=false
+          gh release upload "$TAG" UraniumPCSimulator.apk --clobber --repo "$GITHUB_REPOSITORY"
