@@ -29,101 +29,100 @@ jobs:
         run: |
           java -jar /tmp/apktool.jar b . -o UraniumPCSimulator-unsigned.apk
 
-      - name: Проверка содержимого APK (хэши и манифест)
+      - name: Проверка содержимого APK (хэши и сигнатуры патчей)
         run: |
           python3 - <<'PYEOF'
           import zipfile, hashlib, sys
           z = zipfile.ZipFile('UraniumPCSimulator-unsigned.apk')
           def h(b): return hashlib.sha256(b).hexdigest()[:16]
           ok = True
-          for ap, sp in [
-              ('assets/bin/Data/data.unity3d', 'assets/bin/Data/data.unity3d'),
-              ('lib/arm64-v8a/libil2cpp.so', 'lib/arm64-v8a/libil2cpp.so'),
-              ('lib/armeabi-v7a/libil2cpp.so', 'lib/armeabi-v7a/libil2cpp.so'),
-              ('classes.dex', 'classes.dex'),
-          ]:
-              a, b = h(z.read(ap)), h(open(sp, 'rb').read())
-              print(('OK  ' if a == b else 'FAIL'), ap)
-              ok = ok and a == b
+          def chk(cond, msg):
+              global ok
+              print(('OK   ' if cond else 'FAIL ') + msg)
+              ok = ok and bool(cond)
+
+          for ap in ('assets/bin/Data/data.unity3d',
+                     'assets/bin/Data/sharedassets0.resource',
+                     'lib/arm64-v8a/libil2cpp.so',
+                     'lib/armeabi-v7a/libil2cpp.so',
+                     'classes.dex'):
+              chk(h(z.read(ap)) == h(open(ap, 'rb').read()), ap)
+
           mf = z.read('AndroidManifest.xml')
-          pkg = 'com.UraniumPCS.UraniumPCSimulator'.encode('utf-16-le') in mf
-          print('OK   пакет' if pkg else 'FAIL пакет'); ok = ok and pkg
-          name = b'Uranium PC Simulator' in z.read('resources.arsc')
-          print('OK   app_name' if name else 'FAIL app_name'); ok = ok and name
+          chk('com.UraniumPCS.UraniumPCSimulator'.encode('utf-16-le') in mf, 'пакет')
+          chk(b'Uranium PC Simulator' in z.read('resources.arsc'), 'app_name')
+
           # --- v3: рантайм-литерал заголовка в global-metadata.dat ---
           gm = z.read('assets/bin/Data/Managed/Metadata/global-metadata.dat')
           lit = b'<color=cyan>Uranium</color> <color=red>PC</color> Simulator'
-          c1 = gm[0x1E4A1:0x1E4A1+59] == lit and b'<color=orange>PC</color>' not in gm
-          print('OK   v3 литерал заголовка (metadata)' if c1 else 'FAIL v3 литерал'); ok = ok and c1
-          # --- v3: сигнатуры нативных патчей ---
+          chk(gm[0x1E4A1:0x1E4A1+59] == lit and b'<color=orange>PC</color>' not in gm,
+              'v3 литерал заголовка (metadata)')
+
           so64 = z.read('lib/arm64-v8a/libil2cpp.so')
           so32 = z.read('lib/armeabi-v7a/libil2cpp.so')
-          c2 = so64[0x829668:0x829668+4] == bytes.fromhex('d4d00014')   # b 0x85d9b8 (BTC-кейв)
-          print('OK   v3 arm64 BTC-кейв' if c2 else 'FAIL v3 arm64 BTC-кейв'); ok = ok and c2
-          c3 = so32[0x53bad0:0x53bad0+4] == bytes.fromhex('6ab95cea')   # b 0x1c6a080 (BTC-кейв)
-          print('OK   v3 arm32 BTC-кейв' if c3 else 'FAIL v3 arm32 BTC-кейв'); ok = ok and c3
-          c4 = so64[0x867394:0x867394+4] == bytes.fromhex('210340f9')   # v7: B2 = ОРИГИНАЛ (ldr x1,[x25])
-          print('OK   arm64 B2 = оригинал (v7)' if c4 else 'FAIL arm64 B2'); ok = ok and c4
-          c5 = so32[0x58b9b4:0x58b9b4+4] == bytes.fromhex('000097e5')   # v7: B2 = ОРИГИНАЛ (ldr r0,[r7])
-          print('OK   arm32 B2 = оригинал (v7)' if c5 else 'FAIL arm32 B2'); ok = ok and c5
-          # --- v4: фикс краша (без FadeText), Supports-универсал, selectedFile-слот ---
-          c6 = so64[0x8674dc:0x8674dc+4] == bytes.fromhex('60003fd6')   # blr x3 (fileNameText.set_text)
-          print('OK   v4 arm64 FIX краша (blr)' if c6 else 'FAIL v4 arm64 FIX краша'); ok = ok and c6
-          c7 = so64[0x834ef4:0x834ef4+4] == bytes.fromhex('fba20014')   # b кейв (Supports w|2w|4w|8w)
-          print('OK   v4 arm64 Supports-кейв' if c7 else 'FAIL v4 arm64 Supports-кейв'); ok = ok and c7
-          c8 = so32[0x54aba8:0x54aba8+4] == bytes.fromhex('747d5cea')   # b кейв (Supports w|2w|4w|8w)
-          print('OK   v4 arm32 Supports-кейв' if c8 else 'FAIL v4 arm32 Supports-кейв'); ok = ok and c8
-          c9 = so64[0x8671f8:0x8671f8+4] != bytes.fromhex('50daff17')   # хук v4 УБРАН (ориг. tbnz)
-          print('OK   arm64 без file-хука (откат v4)' if c9 else 'FAIL arm64 file-хук'); ok = ok and c9
-          c10 = so32[0x58b7ec:0x58b7ec+4] == bytes.fromhex('05508fe0') # ориг. add r5,pc,r5
-          print('OK   arm32 без file-хука (откат v4)' if c10 else 'FAIL arm32 file-хук'); ok = ok and c10
-          c11 = so64[0x867540:0x867540+4] == bytes.fromhex('f2ffff17') # FIX1b: b 0x867508 (без FadeText)
-          print('OK   v4 arm64 не-хватает-денег (без FadeText)' if c11 else 'FAIL v4 arm64 FIX1b'); ok = ok and c11
-          c12 = so32[0x58bb48:0x58bb48+4] == bytes.fromhex('1c0094e5') # FIX1a: ldr r0,[r4,#0x1c]
-          print('OK   v4 arm32 неверный-размер (fileNameText)' if c12 else 'FAIL v4 arm32 FIX1a'); ok = ok and c12
-          c13 = so64[0x867384:0x867384+4] == bytes.fromhex('1fdaff17')   # v7 cave2: выбор рамки по ширине
-          print('OK   v7 arm64 cave2' if c13 else 'FAIL v7 arm64 cave2'); ok = ok and c13
-          c14 = so64[0x85dae0+56:0x85dae0+60] == bytes.fromhex('0a791f53')   # v7 sup: lsl w10,w8,#1 (2sw==w — кратность в обе стороны)
-          print('OK   v7 arm64 sup-обратные' if c14 else 'FAIL v7 arm64 sup-обратные'); ok = ok and c14
-          c15 = so32[0x58b9b8:0x58b9bc] == bytes.fromhex('307a5bea')   # v7 cave2-32
-          print('OK   v7 arm32 cave2' if c15 else 'FAIL v7 arm32 cave2'); ok = ok and c15
-          c16 = so32[0x1c6a180+0x3c:0x1c6a180+0x40] == bytes.fromhex('8120a0e1')   # v7 sup32: lsl r2,r1,#1
-          print('OK   v7 arm32 sup-обратные' if c16 else 'FAIL v7 arm32 sup-обратные'); ok = ok and c16
-          c17 = so64[0x85da14:0x85da18] == bytes.fromhex('68000034')   # b10 money64: cbz w8 -> POP (0x85da20), не ret
-          print('OK   b10 money64 cbz->pop (фикс фриза)' if c17 else 'FAIL b10 money64'); ok = ok and c17
-          c18 = so64[0x85da20:0x85da24] == bytes.fromhex('fe0741f8')   # b10 money64: ldr x30,[sp],#0x10
-          print('OK   b10 money64 pop+ret' if c18 else 'FAIL b10 money64 pop'); ok = ok and c18
-          # --- b11: НГ-меню/яйцо/кнопка CH (кейвы + head-хуки) ---
-          c19 = so64[0x7e415c:0x7e4164] == bytes.fromhex('b1e601141f2003d5')  # MainMenu.Start -> ny64
-          print('OK   b11 Start64 -> ny' if c19 else 'FAIL b11 Start64'); ok = ok and c19
-          c20 = so64[0x199acd0:0x199acd8] == bytes.fromhex('1c0cbb171f2003d5') # EventSystem.Update -> es64
-          print('OK   b11 ES64 -> es' if c20 else 'FAIL b11 ES64'); ok = ok and c20
-          c21 = so64[0x81b7f0:0x81b7f8] == bytes.fromhex('540a01141f2003d5')  # Refresh -> rf64
-          print('OK   b11 Refresh64 -> rf' if c21 else 'FAIL b11 Refresh64'); ok = ok and c21
-          c22 = so64[0x7e50f8:0x7e5100] == bytes.fromhex('fae301141f2003d5')  # LoadScene(int) -> ls64
-          print('OK   b11 LoadScene64 -> ls' if c22 else 'FAIL b11 LoadScene64'); ok = ok and c22
-          c23 = so32[0x4e012c:0x4e0134] == bytes.fromhex('59285eea00f020e3')  # Start32 -> ny32
-          print('OK   b11 Start32 -> ny' if c23 else 'FAIL b11 Start32'); ok = ok and c23
-          c24 = so32[0x528af8:0x528b00] == bytes.fromhex('97155dea00f020e3')  # Refresh32 -> rf32
-          print('OK   b11 Refresh32 -> rf' if c24 else 'FAIL b11 Refresh32'); ok = ok and c24
-          c25 = (b'UraniumEggClicks' in so64 and b'UraniumEggClicks' in so32
-                 and b'UraniumPM' in so64 and b'UraniumPM' in so32
-                 and b'bitcoin_searcher' in so64 and b'bitcoin_searcher' in so32
-                 and b'UraniumGift' in so64 and b'UraniumGift' in so32)
-          print('OK   b11 строки кейвов (egg/PM/CH)' if c25 else 'FAIL b11 строки'); ok = ok and c25
-          # --- b12: фикс краша меню (Component->GameObject get_transform) ---
-          c31 = so64[0x85dde4:0x85dde8] == bytes.fromhex('99c73d94')   # es64: bl GO$$get_transform
-          print('OK   b12 Start64 GO.get_transform' if c31 else 'FAIL b12 Start64'); ok = ok and c31
-          c32 = so64[0x85de74:0x85de7c] == bytes.fromhex('e00313aa74c73d94')
-          print('OK   b12 egg64 rect через GO.get_transform' if c32 else 'FAIL b12 egg64'); ok = ok and c32
-          c33 = so32[0x1c80a38:0x1c80a3c] == bytes.fromhex('57f0efeb')  # es32
-          print('OK   b12 Start32 GO.get_transform' if c33 else 'FAIL b12 Start32'); ok = ok and c33
-          c34 = so32[0x1c80ac0:0x1c80acc] == bytes.fromhex('0400a0e134f0efeb0050a0e1')
-          print('OK   b12 egg32 rect через GO.get_transform' if c34 else 'FAIL b12 egg32'); ok = ok and c34
-          import hashlib as _hl
-          _want = open('mod/bundle_b11.sha256').read().strip()
-          c35 = _hl.sha256(z.read('assets/bin/Data/data.unity3d')).hexdigest() == _want
-          print('OK   bundle хэш (ачивка Bitcoin Searcher внутри)' if c35 else 'FAIL bundle'); ok = ok and c35
+
+          # --- v3/v4/v7/b10: всё, что было и осталось ---
+          chk(so64[0x829668:0x829668+4] == bytes.fromhex('d4d00014'), 'v3 arm64 BTC-кейв')
+          chk(so32[0x53bad0:0x53bad0+4] == bytes.fromhex('6ab95cea'), 'v3 arm32 BTC-кейв')
+          chk(so64[0x867394:0x867394+4] == bytes.fromhex('210340f9'), 'v7 arm64 B2 = оригинал')
+          chk(so32[0x58b9b4:0x58b9b4+4] == bytes.fromhex('000097e5'), 'v7 arm32 B2 = оригинал')
+          chk(so64[0x8674dc:0x8674dc+4] == bytes.fromhex('60003fd6'), 'v4 arm64 фикс краша (blr)')
+          chk(so64[0x834ef4:0x834ef4+4] == bytes.fromhex('fba20014'), 'v4 arm64 Supports-кейв')
+          chk(so32[0x54aba8:0x54aba8+4] == bytes.fromhex('747d5cea'), 'v4 arm32 Supports-кейв')
+          chk(so64[0x8671f8:0x8671f8+4] != bytes.fromhex('50daff17'), 'arm64 без file-хука')
+          chk(so32[0x58b7ec:0x58b7ec+4] == bytes.fromhex('05508fe0'), 'arm32 без file-хука')
+          chk(so64[0x867540:0x867540+4] == bytes.fromhex('f2ffff17'), 'v4 arm64 не-хватает-денег')
+          chk(so32[0x58bb48:0x58bb48+4] == bytes.fromhex('1c0094e5'), 'v4 arm32 неверный-размер')
+          chk(so64[0x867384:0x867384+4] == bytes.fromhex('1fdaff17'), 'v7 arm64 cave2')
+          chk(so64[0x85dae0+56:0x85dae0+60] == bytes.fromhex('0a791f53'), 'v7 arm64 sup-обратные')
+          chk(so32[0x58b9b8:0x58b9bc] == bytes.fromhex('307a5bea'), 'v7 arm32 cave2')
+          chk(so32[0x1c6a180+0x3c:0x1c6a180+0x40] == bytes.fromhex('8120a0e1'), 'v7 arm32 sup-обратные')
+          chk(so64[0x85da14:0x85da18] == bytes.fromhex('68000034'), 'b10 money64 cbz->pop')
+          chk(so64[0x85da20:0x85da24] == bytes.fromhex('fe0741f8'), 'b10 money64 pop+ret')
+
+          # --- b11: НГ-хуки (Start/EventSystem/Refresh) ---
+          chk(so64[0x7e415c:0x7e4164] == bytes.fromhex('b1e601141f2003d5'), 'b11 Start64 -> ny')
+          chk(so64[0x199acd0:0x199acd8] == bytes.fromhex('1c0cbb171f2003d5'), 'b11 ES64 -> es')
+          chk(so64[0x81b7f0:0x81b7f8] == bytes.fromhex('540a01141f2003d5'), 'b11 Refresh64 -> rf')
+          chk(so32[0x4e012c:0x4e0134] == bytes.fromhex('59285eea00f020e3'), 'b11 Start32 -> ny')
+          chk(so32[0x528af8:0x528b00] == bytes.fromhex('97155dea00f020e3'), 'b11 Refresh32 -> rf')
+          chk(all(s in so64 and s in so32 for s in
+                  (b'UraniumEggClicks', b'UraniumEggUses', b'bitcoin_searcher',
+                   b'UraniumGift', b'UraniumNY', b'UraniumCH', b'Snow',
+                   b'UraniumCHFlag', b'UraniumEggFlag')),
+              'b13 строки кейвов (включая флажки кнопок)')
+          chk(so64[0x85dde4:0x85dde8] == bytes.fromhex('99c73d94'), 'b12 Start64 GO.get_transform')
+          chk(so32[0x1c80a38:0x1c80a3c] == bytes.fromhex('57f0efeb'), 'b12 Start32 GO.get_transform')
+
+          # --- b13: ГЛАВНОЕ — хук LoadScene снят (мир/сохранения грузятся) ---
+          chk(so64[0x7e50f8:0x7e5100] == bytes.fromhex('f60f1df8f55301a9'),
+              'b13 arm64 LoadScene: оригинальный пролог (хук снят)')
+          chk(so64[0x85e0e0:0x85e140] == b'\x00' * 0x60,
+              'b13 arm64 кейв ls64 обнулён')
+          # --- b13: пасхалка на заголовке меню ---
+          chk(so64[0x85de44:0x85de4c] == bytes.fromhex('000000b000400c91'),
+              'b13 arm64 пасхалка на заголовке')
+          chk(so32[0x1c80a8c:0x1c80a94] == bytes.fromhex('fc019fe500008fe0'),
+              'b13 arm32 пасхалка на заголовке')
+          chk(so64[0x85dec4:0x85dec8] == bytes.fromhex('21e28452'),
+              'b13 arm64 Random.Range(100,10001)')
+          # --- b13: кнопка CH ---
+          chk(so64[0x85e180:0x85e188] == bytes.fromhex('0000009000000c91'), 'b13 arm64 кейв CH')
+          chk(so32[0x1c80d00:0x1c80d08] == bytes.fromhex('d8009fe500008fe0'), 'b13 arm32 кейв CH')
+          chk(so64[0x85dc44:0x85dc48] == bytes.fromhex('97010014'), 'b13 arm64 ny64 -> 3 состояния CH')
+          chk(so32[0x1c6a2cc:0x1c6a2d0] == bytes.fromhex('390000ea'), 'b13 arm32 ny32 -> 3 состояния CH')
+
+          # --- b13: бандл (кнопка CH на экране + НГ-музыка) и ресурс ---
+          want = open('mod/bundle_b13.sha256').read().strip()
+          chk(hashlib.sha256(z.read('assets/bin/Data/data.unity3d')).hexdigest() == want,
+              'bundle b13 (CH_Btn виден, AudioSource на Snow)')
+          wantr = open('mod/resource_b13.sha256').read().strip()
+          res = z.read('assets/bin/Data/sharedassets0.resource')
+          chk(hashlib.sha256(res).hexdigest() == wantr, 'sharedassets0.resource (НГ-музыка)')
+          chk(res[6496:6500] == b'FSB5' and len(res) == 7816640, 'FSB5 с НГ-музыкой на месте')
+          zi = z.getinfo('assets/bin/Data/sharedassets0.resource')
+          chk(zi.compress_type == zipfile.ZIP_STORED, 'sharedassets0.resource не сжат в APK')
+
           print('записей в APK:', len(z.namelist()))
           sys.exit(0 if ok else 1)
           PYEOF
@@ -159,36 +158,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # каждый релиз — отдельный тег (b12: хотфикс краша меню)
-          TAG="v1.9.1.11-uranium.b12"
+          TAG="v1.9.1.11-uranium.b13"
           DATE=$(date +'%Y.%m.%d-%H%M')
           NOTES="Мод Blue PC Simulator: Uranium PC Simulator. Сборка $DATE.
 
-          Изменения b12 (хотфикс):
-          - ИСПРАВЛЕН КРАШ ПРИ ЗАХОДЕ В ИГРУ (b11 падала на старте на arm64/arm32): кейв анимаций меню вызывал Component.get_transform с GameObject — теперь правильный GameObject.get_transform. Если b11 у вас не запускалась — ставьте b12 поверх
-          - Заодно починен easter egg Print Master: прямоугольник клика теперь берётся из реального трансформа строки (раньше читалось несуществующее поле и клик не срабатывал)
-          - ВСЕ функции b11 сохранены: НГ-меню (снег, 1%/сезон 25.12-10.01, кнопка CH), НГ-подарки на кондиционерах, анимации меню (пульс заголовка, дыхание Start), печать на стекло CPU, бесплатные покупки в песочнице, принтер 128x128, маркет 53 товара
+          Изменения b13:
+          - ИСПРАВЛЕНО: НЕ ГРУЗИЛСЯ МИР И СОХРАНЕНИЯ, ИГРА ЗАМИРАЛА. Виноват был хук MainMenu.LoadScene из b11: при индексе сцены < 1 он вызывал PlayerPrefs и затирал сам аргумент — Unity получал мусорный номер сцены (\"Scene with build index: 1543503875 couldn't be loaded\"), корутина LoadAsync падала в NullReferenceException и экран загрузки повисал. На этот же хук была повешена кнопка CH, поэтому одно её нажатие ломало меню до перезапуска. Хук снят полностью, загрузка сцен теперь ровно как в оригинале
+          - ИСПРАВЛЕНО: КНОПКИ CH НЕ БЫЛО ВИДНО. Её клонировали с кнопки Return, у которой якорь в правом нижнем углу, и сместили на +160 по X — кнопка уезжала за край экрана. Теперь CH стоит в левом нижнем углу настроек (зеркало Return) и подписана \"CH\"
+          - ИСПРАВЛЕНО: CH НЕ РАБОТАЛА С 25 ДЕКАБРЯ ПО 10 ЯНВАРЯ. Раньше CH умела только \"включить НГ\", а в сезон он и так включён. Теперь UraniumCH — три состояния: 0 авто (сезон 25.12-10.01 или шанс 1%), 1 всегда НГ, 2 никогда НГ. Кнопка переключает НГ-режим в обе стороны в любой день года, снег и музыка появляются/пропадают СРАЗУ, без перезагрузки сцены
+          - НОВОГОДНЯЯ МУЗЫКА В МЕНЮ (файл от автора мода): играет зациклено, когда включён НГ-режим, и глушится кнопкой CH
+          - ПАСХАЛКА BITCOIN SEARCHER ПЕРЕЕХАЛА: теперь 10 кликов по надписи \"Uranium PC Simulator\" в главном меню дают случайно 100-10000 BTC (было 100-1000 по строке Print Master в ачивках). Работает максимум 2 раза, достижение Bitcoin Searcher выдаётся с первого раза
 
-          План b13: НГ-музыка в меню (файл получен, интегрируем), горизонтальный баннер в 3D.
-
-          Изменения b11:
-          - НОВОГОДНЕЕ МЕНЮ: шанс 1% при каждом входе в меню; гарантированно с 25 декабря по 10 января; в НГ-режиме в меню идёт снег. Кнопка [CH] в настройках (бета!): включает/выключает НГ-режим на следующий заход — меню сразу перезагружается с новым состоянием
-          - НГ-подарки: в комнатах на кондиционере стоят подарки, они мигают и есть ТОЛЬКО в НГ-режиме (без НГ — спрятаны). В комнатах тоже идёт снег в НГ-режиме
-          - EASTER EGG: открой Ачивки и кликни 10 раз по элементу Print Master — получишь случайный биткоин 100-1000. Яйцо работает максимум 2 раза; при втором использовании открывается достижение Bitcoin Searcher (описание засекречено)
-          - Анимации главного меню: заголовок Uranium пульсирует, кнопка Start дышит
-          - Стекло: печать на сайт-баннер наносится на защитное стекло CPU (арт растягивается по стеклу)
-
-          Всё из b10 сохранено: бесплатные покупки в песочнице, принтер 128x128 (печатает 128/256/512/1024), маркет 53 товара, гирлянды к потолку, горизонтальный баннер на сайте PrintExpert.
-
-          План b12: НГ-музыка в меню (ждём файл от юзера), горизонтальный баннер в 3D.
-
-          Изменения v3 (b5):
-          - Заголовок меню больше не возвращается к 'Blue' (патч рантайм-литерала)
-          - Принтеры 512/1024 и горизонтальный баннер видны и покупаются в маркете (фикс карточки 'Title')
-          - Горизонтальный баннер заказывается на сайте PrintExpert: картинка 70x32 (вертикальный баннер - 32x70, как раньше)
-          - Исправлен двойной спавн баннера при покупке на сайте (лишний белый баннер)
-          - Сетка между пикселями и RGB-субпиксели на голограммах вблизи убраны (текстура rgb -> белая)
-          - В режиме песочницы ВСЕ покупки бесплатны (монеты не списываются, BTC-разблокировки не списывают BTC)"
+          Всё из b12 сохранено: анимации меню (пульс заголовка, дыхание Start), НГ-снег в меню и комнатах, НГ-подарки на кондиционерах, печать на защитное стекло CPU, бесплатные покупки в песочнице, принтер 128x128 (печатает 16..1024), маркет 53 товара, горизонтальный баннер на сайте PrintExpert, краски x3, точная печать без искажения цветов."
           if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             gh release upload "$TAG" UraniumPCSimulator.apk --clobber --repo "$GITHUB_REPOSITORY"
           else

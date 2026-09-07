@@ -66,3 +66,52 @@
 2. Описание достижения Bitcoin Searcher + скрытое или видимое.
 3. П.8 «картинка на стекло» — уточнить механику (куда вставлять, на какой ПК).
 4. Подарки — в каких местах/комнате, размер, постоянная анимация?
+
+## b13 — карта изменений
+
+### arm64 (`lib/arm64-v8a/libil2cpp.so`)
+| адрес | что |
+|---|---|
+| `0x7e50f8` | `MainMenu.LoadScene(int)` — **хук снят**, вернулся оригинальный пролог `str x22,[sp,#-0x30]! / stp x21,x20,[sp,#0x10]` |
+| `0x85e0e0..0x85e140` | бывший кейв `ls64` — обнулён |
+| `0x85de44..0x85df88` | кейв пасхалки: `Find("UraniumEggFlag")` → `SetActive(false)` → счётчик кликов → `Random.Range(0x64,0x2711)` → BTC → достижение |
+| `0x85e180` | кейв кнопки CH: `Find("UraniumCHFlag")` → `SetActive(false)` → `UraniumNY ^= 1`, `UraniumCH = NY?1:2`, `Find("Snow").SetActive(NY)` |
+| `0x85e2a0` | ny-ext: `CH==1`→`0x85dcc4` (НГ вкл), `CH==2`→`0x85dcac` (НГ выкл), иначе→`0x85dc48` (авто) |
+| `0x85dc44` | `cbnz w0,#0x85dcc4` → `b 0x85e2a0` |
+| `0x85e300` / `0x85e310` | строки `UraniumCHFlag` / `UraniumEggFlag` |
+
+### arm32 (`lib/armeabi-v7a/libil2cpp.so`)
+| адрес | что |
+|---|---|
+| `0x1c80a8c..0x1c80c14` | кейв пасхалки (аналог arm64), литеральный пул — `0x1c80c90` |
+| `0x1c80d00` | кейв кнопки CH, пул — `0x1c80de0` |
+| `0x1c6a3b8` | ny-ext (`0x1c6a348` вкл / `0x1c6a338` выкл / `0x1c6a2d0` авто) |
+| `0x1c6a2cc` | `bne` → `b 0x1c6a3b8` |
+| `0x1c80e00` / `0x1c80e10` | строки `UraniumCHFlag` / `UraniumEggFlag` |
+| — | head-хука `LoadScene` на arm32 не было вовсе |
+
+Полезные адреса arm32: `String::New 0x415f04`, `GetInt 0x1873b50`,
+`SetInt 0x1873aa0`, `Find 0x187d118`, `SetActive 0x187cc88`,
+`GO.get_transform 0x187cb9c`, `Component.get_transform 0x1879e58`,
+`Random.Range 0x185f1b0`, `MainMenu.get_Instance 0x4dfbb8`,
+BTC: `get 0x4a26dc`, `FS→float 0x5222bc`, `float→FS 0x5222c4`,
+`set 0x4a2750`, `upd 0x4a2ad4`; CloudOnce: `0x4a48b0`, `0x4a4bfc`, `0x5295e8`.
+
+### Ассеты
+| объект | что |
+|---|---|
+| `level0` RT 1345 | якорь `(1,0)`→`(0,0)`, позиция `(160,40)` — кнопка CH вернулась на экран |
+| `level0` MB 1347 | текст `[CH]` → `CH` |
+| `level0` MB 1348 | `onClick`: `LoadScene(0)` → `UraniumCHFlag.SetActive(true)` + `MenuManager.PlayClickSound` |
+| `level0` GO 1349/RT 1350 | `UraniumCHFlag` (неактивен, ребёнок `CH_Btn`) |
+| `level0` GO 1351/RT 1352 | `UraniumEggFlag` (неактивен, ребёнок `Title`) |
+| `level0` MB 1353 | новый `Button` на GO 125 `Title` (`m_Transition = None`) |
+| `level0` AudioSource 1354 | на GO 141 `Snow`: клип `sharedassets0:285`, loop, playOnAwake, volume 0.55 |
+| `sharedassets0.assets` 285 | `AudioClip Uranium_NY_Menu` — PCM, 22050 Гц, моно, 177.1 с |
+| `sharedassets0.resource` | + FSB5 (`mode=2`) со смещения 6496, размер 7 810 144 Б |
+
+Раскладка `PersistentCall` (проверено на рабочей кнопке `level0` MB 957):
+`m_Target(PPtr 12)`, `m_TargetAssemblyTypeName(str)`, `m_MethodName(str)`,
+`m_Mode(int, 6=Bool)`, `m_ObjectArgument(PPtr 12)`,
+`m_ObjectArgumentAssemblyTypeName(str)`, `m_IntArgument`, `m_FloatArgument`,
+`m_StringArgument(str)`, `m_BoolArgument(int)`, `m_CallState(int, 2=RuntimeOnly)`.
