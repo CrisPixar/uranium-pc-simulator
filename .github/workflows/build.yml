@@ -131,15 +131,19 @@ jobs:
       - name: ZipAlign + Sign (apksigner, v1+v2+v3)
         env:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
         run: |
           BT=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -1)
           echo "build-tools: $BT"
+          test -n "$KEYSTORE_BASE64" || { echo "нет секрета KEYSTORE_BASE64"; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > uranium.jks
           "$BT/zipalign" -f -p 4 UraniumPCSimulator-unsigned.apk UraniumPCSimulator-aligned.apk
           "$BT/apksigner" sign \
             --ks uranium.jks \
             --ks-key-alias uranium \
-            --ks-pass pass:***REMOVED-KEYSTORE-PASS*** \
-            --key-pass pass:***REMOVED-KEYSTORE-PASS*** \
+            --ks-pass pass:$KEYSTORE_PASSWORD \
+            --key-pass pass:$KEYSTORE_PASSWORD \
             --out UraniumPCSimulator.apk \
             UraniumPCSimulator-aligned.apk
           "$BT/apksigner" verify --print-certs UraniumPCSimulator.apk || true
