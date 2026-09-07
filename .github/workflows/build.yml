@@ -122,10 +122,14 @@ jobs:
           chk(so64[0x85de88:0x85de8c] == bytes.fromhex('bf160071'), 'b15 arm64 egg 5 кликов')
           chk(so32[0x1c80ad4:0x1c80ad8] == bytes.fromhex('050055e3'), 'b15 arm32 egg 5 кликов')
 
-          # --- b13/b14: бандл (кнопка CH на экране + НГ-музыка) и ресурс ---
-          want = open('mod/bundle_b13.sha256').read().strip()
+          # --- b16: подарки не мигают (всегда видны), снег/музыка активны ---
+          chk(so64[0x85e058:0x85e05c] == bytes.fromhex('34008052'), 'b16 arm64 подарок без мигания')
+          chk(so32[0x1c713a0:0x1c713a4] == bytes.fromhex('0150a0e3'), 'b16 arm32 подарок без мигания')
+
+          # --- b13/b14/b16: бандл (кнопка CH, подарки, снег) и ресурс ---
+          want = open('mod/bundle_b16.sha256').read().strip()
           chk(hashlib.sha256(z.read('assets/bin/Data/data.unity3d')).hexdigest() == want,
-              'bundle b14 (CH_Btn якорь (0,0), AudioSource на Snow)')
+              'bundle b16 (подарки на полу/кондиционере, красный подарок, Snow активен)')
           wantr = open('mod/resource_b13.sha256').read().strip()
           res = z.read('assets/bin/Data/sharedassets0.resource')
           chk(hashlib.sha256(res).hexdigest() == wantr, 'sharedassets0.resource (НГ-музыка)')
@@ -168,9 +172,14 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.9.1.11-uranium.b15"
+          TAG="v1.9.1.11-uranium.b16"
           DATE=$(date +'%Y.%m.%d-%H%M')
           NOTES="Мод Blue PC Simulator: Uranium PC Simulator. Сборка $DATE.
+
+          Изменения b16 (новогодний декор и музыка):
+          - ПОДАРКИ БОЛЬШЕ НЕ МИГАЮТ: зелёный подарок стоит на полу у мусорки, красный — на кондиционере (в комнатах level1/3/4/5)
+          - КРАСНЫЙ ПОДАРОК: добавлена красная текстура и материал, клон подарка на кондиционере теперь красный
+          - МУЗЫКА И СНЕГ: объект «Snow» был неактивен, из-за чего GameObject.Find(«Snow») его не находил и музыка/снег не включались. Теперь Snow активен — музыка и снег работают
 
           Изменения b15:
           - ПАСХАЛКА BITCOIN SEARCHER СРАБАТЫВАЕТ ПОСЛЕ 5 КЛИКОВ по заголовку «Uranium PC Simulator» (было 10): случайно 100-10000 BTC, максимум 2 раза, достижение с первого раза
