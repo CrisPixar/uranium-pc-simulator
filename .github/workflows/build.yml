@@ -93,6 +93,24 @@ jobs:
           print('OK   b10 money64 cbz->pop (фикс фриза)' if c17 else 'FAIL b10 money64'); ok = ok and c17
           c18 = so64[0x85da20:0x85da24] == bytes.fromhex('fe0741f8')   # b10 money64: ldr x30,[sp],#0x10
           print('OK   b10 money64 pop+ret' if c18 else 'FAIL b10 money64 pop'); ok = ok and c18
+          # --- b11: НГ-меню/яйцо/кнопка CH (кейвы + head-хуки) ---
+          c19 = so64[0x7e415c:0x7e4160] == bytes.fromhex('b1e601141f2003d5')  # MainMenu.Start -> ny64
+          print('OK   b11 Start64 -> ny' if c19 else 'FAIL b11 Start64'); ok = ok and c19
+          c20 = so64[0x199acd0:0x199acd8] == bytes.fromhex('1c0cbb171f2003d5') # EventSystem.Update -> es64
+          print('OK   b11 ES64 -> es' if c20 else 'FAIL b11 ES64'); ok = ok and c20
+          c21 = so64[0x81b7f0:0x81b7f8] == bytes.fromhex('540a01141f2003d5')  # Refresh -> rf64
+          print('OK   b11 Refresh64 -> rf' if c21 else 'FAIL b11 Refresh64'); ok = ok and c21
+          c22 = so64[0x7e50f8:0x7e5100] == bytes.fromhex('fae301141f2003d5')  # LoadScene(int) -> ls64
+          print('OK   b11 LoadScene64 -> ls' if c22 else 'FAIL b11 LoadScene64'); ok = ok and c22
+          c23 = so32[0x4e012c:0x4e0134] == bytes.fromhex('59285eea00f020e3')  # Start32 -> ny32
+          print('OK   b11 Start32 -> ny' if c23 else 'FAIL b11 Start32'); ok = ok and c23
+          c24 = so32[0x528af8:0x528b00] == bytes.fromhex('97155dea00f020e3')  # Refresh32 -> rf32
+          print('OK   b11 Refresh32 -> rf' if c24 else 'FAIL b11 Refresh32'); ok = ok and c24
+          c25 = (b'UraniumEggClicks' in so64 and b'UraniumEggClicks' in so32
+                 and b'UraniumPM' in so64 and b'UraniumPM' in so32
+                 and b'bitcoin_searcher' in so64 and b'bitcoin_searcher' in so32
+                 and b'UraniumGift' in so64 and b'UraniumGift' in so32)
+          print('OK   b11 строки кейвов (egg/PM/CH)' if c25 else 'FAIL b11 строки'); ok = ok and c25
           print('записей в APK:', len(z.namelist()))
           sys.exit(0 if ok else 1)
           PYEOF
@@ -124,18 +142,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # каждый релиз — отдельный тег (b10: фикс фриза покупки вне песочницы)
-          TAG="v1.9.1.11-uranium.b10"
+          # каждый релиз — отдельный тег (b11: НГ-режим, easter egg, кнопка CH, стекло)
+          TAG="v1.9.1.11-uranium.b11"
           DATE=$(date +'%Y.%m.%d-%H%M')
           NOTES="Мод Blue PC Simulator: Uranium PC Simulator. Сборка $DATE.
 
-          Изменения b10:
-          - ФРИЗ ПОКУПКИ БАННЕРА ИСПРАВЛЕН: в кейве денег (бесплатные покупки) ветка \"обычный режим\" возвращалась не туда (ret вместо pop) и навсегда зацикливала игру при покупке ВНЕ песочницы. Теперь честно: в песочнице покупки бесплатны, вне песочницы цена списывается как в оригинале (200 монет)
-          - Вертикальный 32x70 и горизонтальный 70x32 баннеры работают и в песочнице, и в обычном режиме
+          Изменения b11:
+          - НОВОГОДНЕЕ МЕНЮ: шанс 1% при каждом входе в меню; гарантированно с 25 декабря по 10 января; в НГ-режиме в меню идёт снег. Кнопка [CH] в настройках (бета!): включает/выключает НГ-режим на следующий заход — меню сразу перезагружается с новым состоянием
+          - НГ-подарки: в комнатах на кондиционере стоят подарки, они мигают и есть ТОЛЬКО в НГ-режиме (без НГ — спрятаны). В комнатах тоже идёт снег в НГ-режиме
+          - EASTER EGG: открой Ачивки и кликни 10 раз по элементу Print Master — получишь случайный биткоин 100-1000. Яйцо работает максимум 2 раза; при втором использовании открывается достижение Bitcoin Searcher (описание засекречено)
+          - Анимации главного меню: заголовок Uranium пульсирует, кнопка Start дышит
+          - Стекло: печать на сайт-баннер наносится на защитное стекло CPU (арт растягивается по стеклу)
 
-          Всё из b9 сохранено: принтер 128x128 (печатает 128/256/512/1024), маркет 53 товара, гирлянды к потолку, горизонтальный баннер на сайте PrintExpert, стекло.
+          Всё из b10 сохранено: бесплатные покупки в песочнице, принтер 128x128 (печатает 128/256/512/1024), маркет 53 товара, гирлянды к потолку, горизонтальный баннер на сайте PrintExpert.
 
-          План b11: новогоднее меню (снег/гирлянды/музыка, шанс 1%, 25.12-10.01, кнопка CH), ачивка Bitcoin Searcher, подарки.
+          План b12: НГ-музыка в меню (ждём файл от юзера), горизонтальный баннер в 3D.
 
           Изменения v3 (b5):
           - Заголовок меню больше не возвращается к 'Blue' (патч рантайм-литерала)
