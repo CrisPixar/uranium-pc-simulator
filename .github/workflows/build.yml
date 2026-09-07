@@ -111,6 +111,19 @@ jobs:
                  and b'bitcoin_searcher' in so64 and b'bitcoin_searcher' in so32
                  and b'UraniumGift' in so64 and b'UraniumGift' in so32)
           print('OK   b11 строки кейвов (egg/PM/CH)' if c25 else 'FAIL b11 строки'); ok = ok and c25
+          # --- b12: фикс краша меню (Component->GameObject get_transform) ---
+          c31 = so64[0x85dde4:0x85dde8] == bytes.fromhex('99c73d94')   # es64: bl GO$$get_transform
+          print('OK   b12 Start64 GO.get_transform' if c31 else 'FAIL b12 Start64'); ok = ok and c31
+          c32 = so64[0x85de74:0x85de7c] == bytes.fromhex('e00313aa74c73d94')
+          print('OK   b12 egg64 rect через GO.get_transform' if c32 else 'FAIL b12 egg64'); ok = ok and c32
+          c33 = so32[0x1c80a38:0x1c80a3c] == bytes.fromhex('57f0efeb')  # es32
+          print('OK   b12 Start32 GO.get_transform' if c33 else 'FAIL b12 Start32'); ok = ok and c33
+          c34 = so32[0x1c80ac0:0x1c80acc] == bytes.fromhex('0400a0e134f0efeb0050a0e1')
+          print('OK   b12 egg32 rect через GO.get_transform' if c34 else 'FAIL b12 egg32'); ok = ok and c34
+          import hashlib as _hl
+          _want = open('mod/bundle_b11.sha256').read().strip()
+          c35 = _hl.sha256(z.read('assets/bin/Data/data.unity3d')).hexdigest() == _want
+          print('OK   bundle хэш (ачивка Bitcoin Searcher внутри)' if c35 else 'FAIL bundle'); ok = ok and c35
           print('записей в APK:', len(z.namelist()))
           sys.exit(0 if ok else 1)
           PYEOF
@@ -142,10 +155,17 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # каждый релиз — отдельный тег (b11: НГ-режим, easter egg, кнопка CH, стекло)
-          TAG="v1.9.1.11-uranium.b11"
+          # каждый релиз — отдельный тег (b12: хотфикс краша меню)
+          TAG="v1.9.1.11-uranium.b12"
           DATE=$(date +'%Y.%m.%d-%H%M')
           NOTES="Мод Blue PC Simulator: Uranium PC Simulator. Сборка $DATE.
+
+          Изменения b12 (хотфикс):
+          - ИСПРАВЛЕН КРАШ ПРИ ЗАХОДЕ В ИГРУ (b11 падала на старте на arm64/arm32): кейв анимаций меню вызывал Component.get_transform с GameObject — теперь правильный GameObject.get_transform. Если b11 у вас не запускалась — ставьте b12 поверх
+          - Заодно починен easter egg Print Master: прямоугольник клика теперь берётся из реального трансформа строки (раньше читалось несуществующее поле и клик не срабатывал)
+          - ВСЕ функции b11 сохранены: НГ-меню (снег, 1%/сезон 25.12-10.01, кнопка CH), НГ-подарки на кондиционерах, анимации меню (пульс заголовка, дыхание Start), печать на стекло CPU, бесплатные покупки в песочнице, принтер 128x128, маркет 53 товара
+
+          План b13: НГ-музыка в меню (файл получен, интегрируем), горизонтальный баннер в 3D.
 
           Изменения b11:
           - НОВОГОДНЕЕ МЕНЮ: шанс 1% при каждом входе в меню; гарантированно с 25 декабря по 10 января; в НГ-режиме в меню идёт снег. Кнопка [CH] в настройках (бета!): включает/выключает НГ-режим на следующий заход — меню сразу перезагружается с новым состоянием
