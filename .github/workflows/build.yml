@@ -126,10 +126,20 @@ jobs:
           chk(so64[0x85e058:0x85e05c] == bytes.fromhex('34008052'), 'b16 arm64 подарок без мигания')
           chk(so32[0x1c713a0:0x1c713a4] == bytes.fromhex('0150a0e3'), 'b16 arm32 подарок без мигания')
 
-          # --- b13/b14/b16: бандл (кнопка CH, подарки, снег) и ресурс ---
-          want = open('mod/bundle_b16.sha256').read().strip()
+          # --- b17: кнопка CH цветом + всплывающий «+N BTC» ---
+          chk(so64[0x85e204:0x85e208] == bytes.fromhex('47000014'), 'b17 arm64 CH64 -> cave')
+          chk(so64[0x85ded0:0x85ded4] == bytes.fromhex('7c010094'), 'b17 arm64 egg -> helper')
+          chk(so64[0x85e520:0x85e530] == bytes.fromhex('000000000000803f000000000000803f'), 'b17 arm64 GREEN')
+          chk(so64[0x85e530:0x85e540] == bytes.fromhex('0000803f00000000000000000000803f'), 'b17 arm64 RED')
+          chk(so64[0x85e4e0:0x85e4f0] == b'UnityEngine.UI\x00\x00', 'b17 arm64 строка UnityEngine.UI')
+          chk(so32[0x1c80d8c:0x1c80d90] == bytes.fromhex('8ea5ffea'), 'b17 arm32 CH32 -> cave')
+          chk(so32[0x1c80b18:0x1c80b1c] == bytes.fromhex('45a7ffeb'), 'b17 arm32 egg -> helper')
+          chk(so32[0x1c6a5c0:0x1c6a5d0] == b'UnityEngine.UI\x00\x00', 'b17 arm32 строка UnityEngine.UI')
+
+          # --- b17: бандл (гирлянда, снег на столе, BtcPop) и ресурс ---
+          want = open('mod/bundle_b17.sha256').read().strip()
           chk(hashlib.sha256(z.read('assets/bin/Data/data.unity3d')).hexdigest() == want,
-              'bundle b16 (подарки на полу/кондиционере, красный подарок, Snow активен)')
+              'bundle b17 (гирлянда, снег на столе, BtcPop)')
           wantr = open('mod/resource_b13.sha256').read().strip()
           res = z.read('assets/bin/Data/sharedassets0.resource')
           chk(hashlib.sha256(res).hexdigest() == wantr, 'sharedassets0.resource (НГ-музыка)')
@@ -172,14 +182,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.9.1.11-uranium.b16"
+          TAG="v1.9.1.11-uranium.b17"
           DATE=$(date +'%Y.%m.%d-%H%M')
           NOTES="Мод Blue PC Simulator: Uranium PC Simulator. Сборка $DATE.
+
+          Изменения b17 (кнопка CH цветом + всплывающий «+N BTC»):
+          - КНОПКА CH: текст «CH» подсвечивается зелёным, когда НГ-режим включён, и красным, когда выключен (рабочее/нерабочее состояние различается визуально)
+          - «+N BTC»: после пасхалки (5 кликов по заголовку «Uranium PC Simulator») на 10 секунд появляется анимированная надпись «+<сумма> BTC»
+          - ГИРЛЯНДА: 3D-гирлянда (красные/зелёные лампочки) на стене в меню
+          - СНЕГ: снежинки падают быстрее и привязаны к потолку; снег добавлен на стол в меню
+          - Обе архитектуры собраны полностью: arm64-v8a и armeabi-v7a (b1–b17)
 
           Изменения b16 (новогодний декор и музыка):
           - ПОДАРКИ БОЛЬШЕ НЕ МИГАЮТ: зелёный подарок стоит на полу у мусорки, красный — на кондиционере (в комнатах level1/3/4/5)
           - КРАСНЫЙ ПОДАРОК: добавлена красная текстура и материал, клон подарка на кондиционере теперь красный
-          - МУЗЫКА И СНЕГ: объект «Snow» был неактивен, из-за чего GameObject.Find(«Snow») его не находил и музыка/снег не включались. Теперь Snow активен — музыка и снег работают
+          - МУЗЫКА И СНЕГ: объект «Snow» активирован — музыка и снег работают
 
           Изменения b15:
           - ПАСХАЛКА BITCOIN SEARCHER СРАБАТЫВАЕТ ПОСЛЕ 5 КЛИКОВ по заголовку «Uranium PC Simulator» (было 10): случайно 100-10000 BTC, максимум 2 раза, достижение с первого раза
