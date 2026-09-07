@@ -94,7 +94,7 @@ jobs:
           c18 = so64[0x85da20:0x85da24] == bytes.fromhex('fe0741f8')   # b10 money64: ldr x30,[sp],#0x10
           print('OK   b10 money64 pop+ret' if c18 else 'FAIL b10 money64 pop'); ok = ok and c18
           # --- b11: НГ-меню/яйцо/кнопка CH (кейвы + head-хуки) ---
-          c19 = so64[0x7e415c:0x7e4160] == bytes.fromhex('b1e601141f2003d5')  # MainMenu.Start -> ny64
+          c19 = so64[0x7e415c:0x7e4164] == bytes.fromhex('b1e601141f2003d5')  # MainMenu.Start -> ny64
           print('OK   b11 Start64 -> ny' if c19 else 'FAIL b11 Start64'); ok = ok and c19
           c20 = so64[0x199acd0:0x199acd8] == bytes.fromhex('1c0cbb171f2003d5') # EventSystem.Update -> es64
           print('OK   b11 ES64 -> es' if c20 else 'FAIL b11 ES64'); ok = ok and c20
