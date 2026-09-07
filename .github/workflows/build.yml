@@ -1,0 +1,152 @@
+name: Build Uranium PC Simulator
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install apktool
+        run: |
+          curl -sL -o /tmp/apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v2.10.0/apktool_2.10.0.jar
+
+      - name: Build APK (apktool b)
+        run: |
+          java -jar /tmp/apktool.jar b . -o UraniumPCSimulator-unsigned.apk
+
+      - name: Проверка содержимого APK (хэши и манифест)
+        run: |
+          python3 - <<'PYEOF'
+          import zipfile, hashlib, sys
+          z = zipfile.ZipFile('UraniumPCSimulator-unsigned.apk')
+          def h(b): return hashlib.sha256(b).hexdigest()[:16]
+          ok = True
+          for ap, sp in [
+              ('assets/bin/Data/data.unity3d', 'assets/bin/Data/data.unity3d'),
+              ('lib/arm64-v8a/libil2cpp.so', 'lib/arm64-v8a/libil2cpp.so'),
+              ('lib/armeabi-v7a/libil2cpp.so', 'lib/armeabi-v7a/libil2cpp.so'),
+              ('classes.dex', 'classes.dex'),
+          ]:
+              a, b = h(z.read(ap)), h(open(sp, 'rb').read())
+              print(('OK  ' if a == b else 'FAIL'), ap)
+              ok = ok and a == b
+          mf = z.read('AndroidManifest.xml')
+          pkg = 'com.UraniumPCS.UraniumPCSimulator'.encode('utf-16-le') in mf
+          print('OK   пакет' if pkg else 'FAIL пакет'); ok = ok and pkg
+          name = b'Uranium PC Simulator' in z.read('resources.arsc')
+          print('OK   app_name' if name else 'FAIL app_name'); ok = ok and name
+          # --- v3: рантайм-литерал заголовка в global-metadata.dat ---
+          gm = z.read('assets/bin/Data/Managed/Metadata/global-metadata.dat')
+          lit = b'<color=cyan>Uranium</color> <color=red>PC</color> Simulator'
+          c1 = gm[0x1E4A1:0x1E4A1+59] == lit and b'<color=orange>PC</color>' not in gm
+          print('OK   v3 литерал заголовка (metadata)' if c1 else 'FAIL v3 литерал'); ok = ok and c1
+          # --- v3: сигнатуры нативных патчей ---
+          so64 = z.read('lib/arm64-v8a/libil2cpp.so')
+          so32 = z.read('lib/armeabi-v7a/libil2cpp.so')
+          c2 = so64[0x829668:0x829668+4] == bytes.fromhex('d4d00014')   # b 0x85d9b8 (BTC-кейв)
+          print('OK   v3 arm64 BTC-кейв' if c2 else 'FAIL v3 arm64 BTC-кейв'); ok = ok and c2
+          c3 = so32[0x53bad0:0x53bad0+4] == bytes.fromhex('6ab95cea')   # b 0x1c6a080 (BTC-кейв)
+          print('OK   v3 arm32 BTC-кейв' if c3 else 'FAIL v3 arm32 BTC-кейв'); ok = ok and c3
+          c4 = so64[0x867394:0x867394+4] == bytes.fromhex('210340f9')   # v7: B2 = ОРИГИНАЛ (ldr x1,[x25])
+          print('OK   arm64 B2 = оригинал (v7)' if c4 else 'FAIL arm64 B2'); ok = ok and c4
+          c5 = so32[0x58b9b4:0x58b9b4+4] == bytes.fromhex('000097e5')   # v7: B2 = ОРИГИНАЛ (ldr r0,[r7])
+          print('OK   arm32 B2 = оригинал (v7)' if c5 else 'FAIL arm32 B2'); ok = ok and c5
+          # --- v4: фикс краша (без FadeText), Supports-универсал, selectedFile-слот ---
+          c6 = so64[0x8674dc:0x8674dc+4] == bytes.fromhex('60003fd6')   # blr x3 (fileNameText.set_text)
+          print('OK   v4 arm64 FIX краша (blr)' if c6 else 'FAIL v4 arm64 FIX краша'); ok = ok and c6
+          c7 = so64[0x834ef4:0x834ef4+4] == bytes.fromhex('fba20014')   # b кейв (Supports w|2w|4w|8w)
+          print('OK   v4 arm64 Supports-кейв' if c7 else 'FAIL v4 arm64 Supports-кейв'); ok = ok and c7
+          c8 = so32[0x54aba8:0x54aba8+4] == bytes.fromhex('747d5cea')   # b кейв (Supports w|2w|4w|8w)
+          print('OK   v4 arm32 Supports-кейв' if c8 else 'FAIL v4 arm32 Supports-кейв'); ok = ok and c8
+          c9 = so64[0x8671f8:0x8671f8+4] != bytes.fromhex('50daff17')   # хук v4 УБРАН (ориг. tbnz)
+          print('OK   arm64 без file-хука (откат v4)' if c9 else 'FAIL arm64 file-хук'); ok = ok and c9
+          c10 = so32[0x58b7ec:0x58b7ec+4] == bytes.fromhex('05508fe0') # ориг. add r5,pc,r5
+          print('OK   arm32 без file-хука (откат v4)' if c10 else 'FAIL arm32 file-хук'); ok = ok and c10
+          c11 = so64[0x867540:0x867540+4] == bytes.fromhex('f2ffff17') # FIX1b: b 0x867508 (без FadeText)
+          print('OK   v4 arm64 не-хватает-денег (без FadeText)' if c11 else 'FAIL v4 arm64 FIX1b'); ok = ok and c11
+          c12 = so32[0x58bb48:0x58bb48+4] == bytes.fromhex('1c0094e5') # FIX1a: ldr r0,[r4,#0x1c]
+          print('OK   v4 arm32 неверный-размер (fileNameText)' if c12 else 'FAIL v4 arm32 FIX1a'); ok = ok and c12
+          c13 = so64[0x867384:0x867384+4] == bytes.fromhex('1fdaff17')   # v7 cave2: выбор рамки по ширине
+          print('OK   v7 arm64 cave2' if c13 else 'FAIL v7 arm64 cave2'); ok = ok and c13
+          c14 = so64[0x85dae0+56:0x85dae0+60] == bytes.fromhex('0a791f53')   # v7 sup: lsl w10,w8,#1 (2sw==w — кратность в обе стороны)
+          print('OK   v7 arm64 sup-обратные' if c14 else 'FAIL v7 arm64 sup-обратные'); ok = ok and c14
+          c15 = so32[0x58b9b8:0x58b9bc] == bytes.fromhex('307a5bea')   # v7 cave2-32
+          print('OK   v7 arm32 cave2' if c15 else 'FAIL v7 arm32 cave2'); ok = ok and c15
+          c16 = so32[0x1c6a180+0x3c:0x1c6a180+0x40] == bytes.fromhex('8120a0e1')   # v7 sup32: lsl r2,r1,#1
+          print('OK   v7 arm32 sup-обратные' if c16 else 'FAIL v7 arm32 sup-обратные'); ok = ok and c16
+          c17 = so64[0x85da14:0x85da18] == bytes.fromhex('68000034')   # b10 money64: cbz w8 -> POP (0x85da20), не ret
+          print('OK   b10 money64 cbz->pop (фикс фриза)' if c17 else 'FAIL b10 money64'); ok = ok and c17
+          c18 = so64[0x85da20:0x85da24] == bytes.fromhex('fe0741f8')   # b10 money64: ldr x30,[sp],#0x10
+          print('OK   b10 money64 pop+ret' if c18 else 'FAIL b10 money64 pop'); ok = ok and c18
+          print('записей в APK:', len(z.namelist()))
+          sys.exit(0 if ok else 1)
+          PYEOF
+
+      - name: ZipAlign + Sign (apksigner, v1+v2+v3)
+        env:
+          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        run: |
+          BT=$(ls -d "$ANDROID_SDK_ROOT"/build-tools/* | sort -V | tail -1)
+          echo "build-tools: $BT"
+          "$BT/zipalign" -f -p 4 UraniumPCSimulator-unsigned.apk UraniumPCSimulator-aligned.apk
+          "$BT/apksigner" sign \
+            --ks uranium.jks \
+            --ks-key-alias uranium \
+            --ks-pass pass:***REMOVED-KEYSTORE-PASS*** \
+            --key-pass pass:***REMOVED-KEYSTORE-PASS*** \
+            --out UraniumPCSimulator.apk \
+            UraniumPCSimulator-aligned.apk
+          "$BT/apksigner" verify --print-certs UraniumPCSimulator.apk || true
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: UraniumPCSimulator
+          path: UraniumPCSimulator.apk
+          retention-days: 90
+
+      - name: Create release (новый тег на каждую сборку)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # каждый релиз — отдельный тег (b10: фикс фриза покупки вне песочницы)
+          TAG="v1.9.1.11-uranium.b10"
+          DATE=$(date +'%Y.%m.%d-%H%M')
+          NOTES="Мод Blue PC Simulator: Uranium PC Simulator. Сборка $DATE.
+
+          Изменения b10:
+          - ФРИЗ ПОКУПКИ БАННЕРА ИСПРАВЛЕН: в кейве денег (бесплатные покупки) ветка \"обычный режим\" возвращалась не туда (ret вместо pop) и навсегда зацикливала игру при покупке ВНЕ песочницы. Теперь честно: в песочнице покупки бесплатны, вне песочницы цена списывается как в оригинале (200 монет)
+          - Вертикальный 32x70 и горизонтальный 70x32 баннеры работают и в песочнице, и в обычном режиме
+
+          Всё из b9 сохранено: принтер 128x128 (печатает 128/256/512/1024), маркет 53 товара, гирлянды к потолку, горизонтальный баннер на сайте PrintExpert, стекло.
+
+          План b11: новогоднее меню (снег/гирлянды/музыка, шанс 1%, 25.12-10.01, кнопка CH), ачивка Bitcoin Searcher, подарки.
+
+          Изменения v3 (b5):
+          - Заголовок меню больше не возвращается к 'Blue' (патч рантайм-литерала)
+          - Принтеры 512/1024 и горизонтальный баннер видны и покупаются в маркете (фикс карточки 'Title')
+          - Горизонтальный баннер заказывается на сайте PrintExpert: картинка 70x32 (вертикальный баннер - 32x70, как раньше)
+          - Исправлен двойной спавн баннера при покупке на сайте (лишний белый баннер)
+          - Сетка между пикселями и RGB-субпиксели на голограммах вблизи убраны (текстура rgb -> белая)
+          - В режиме песочницы ВСЕ покупки бесплатны (монеты не списываются, BTC-разблокировки не списывают BTC)"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" UraniumPCSimulator.apk --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$TAG" UraniumPCSimulator.apk --repo "$GITHUB_REPOSITORY" \
+              --title "Uranium PC Simulator $TAG" --notes "$NOTES" --prerelease=false
+          fi

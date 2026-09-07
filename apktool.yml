@@ -1,0 +1,66 @@
+!!brut.androlib.meta.MetaInfo
+apkFileName: UraniumPCSimulator.apk
+compressionType: false
+doNotCompress:
+- resources.arsc
+- assets/Examples/1.7.0.pc
+- assets/Examples/1.8.0.pc
+- assets/Examples/1.9.0.11.bpc
+- assets/Examples/1.9.0.11.pc
+- assets/Examples/Classic.pc
+- assets/Examples/Hidden Room.pc
+- assets/SoundFonts/Nokia S30.sf2
+- assets/SoundFonts/Roland SC-55.sf2
+- assets/bin/Data/data.unity3d
+- assets/bin/Data/resources.resource
+- assets/bin/Data/sharedassets0.resource
+- assets/bin/Data/sharedassets1.resource
+- assets/bin/Data/sharedassets2.resource
+- assets/bin/Data/sharedassets6.resource
+- png
+- res/raw/com_android_billingclient_heterodyne_info
+- res/raw/com_android_billingclient_registration_info.binarypb
+isApkDebug: false
+packageInfo:
+  forcedPackageId: '127'
+  renameManifestPackage: null
+sdkInfo:
+  minSdkVersion: '23'
+  targetSdkVersion: '36'
+sharedLibrary: false
+sparseResources: false
+unknownFiles:
+  META-INF/androidx.loader_loader.version: '0'
+  firebase-encoders-proto.properties: '8'
+  billing.properties: '8'
+  firebase-encoders-json.properties: '8'
+  META-INF/androidx.lifecycle_lifecycle-livedata.version: '0'
+  META-INF/androidx.lifecycle_lifecycle-runtime.version: '0'
+  play-services-tasks.properties: '8'
+  transport-runtime.properties: '8'
+  META-INF/androidx.lifecycle_lifecycle-livedata-core.version: '0'
+  META-INF/androidx.lifecycle_lifecycle-viewmodel-savedstate.version: '0'
+  META-INF/androidx.viewpager_viewpager.version: '0'
+  META-INF/androidx.lifecycle_lifecycle-viewmodel.version: '0'
+  play-services-places-placereport.properties: '8'
+  play-services-basement.properties: '8'
+  META-INF/androidx.arch.core_core-runtime.version: '0'
+  META-INF/androidx.tracing_tracing.version: '0'
+  firebase-encoders.properties: '8'
+  play-services-location.properties: '8'
+  transport-backend-cct.properties: '8'
+  META-INF/androidx.fragment_fragment.version: '0'
+  play-services-base.properties: '8'
+  META-INF/androidx.customview_customview.version: '0'
+  transport-api.properties: '8'
+  META-INF/com.android.games.engine.build_fingerprint: '0'
+  META-INF/androidx.savedstate_savedstate.version: '0'
+  META-INF/com/android/build/gradle/app-metadata.properties: '8'
+usesFramework:
+  ids:
+  - 1
+  tag: null
+version: 2.10.0
+versionInfo:
+  versionCode: '2'
+  versionName: 1.9.1.12-uranium
