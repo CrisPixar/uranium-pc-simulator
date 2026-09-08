@@ -171,6 +171,9 @@ jobs:
             UraniumPCSimulator-aligned.apk
           "$BT/apksigner" verify --print-certs UraniumPCSimulator.apk || true
 
+      - name: Verify manifest package (dot check)
+        run: python3 scripts/ci/verify_manifest.py UraniumPCSimulator.apk
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
