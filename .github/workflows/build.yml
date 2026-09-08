@@ -136,15 +136,19 @@ jobs:
           chk(so32[0x1c80b18:0x1c80b1c] == bytes.fromhex('45a7ffeb'), 'b17 arm32 egg -> helper')
           chk(so32[0x1c6a5c0:0x1c6a5d0] == b'UnityEngine.UI\x00\x00', 'b17 arm32 строка UnityEngine.UI')
 
-          # --- b18: фикс краша b17 (аргументы DAO + гарды рефлексии) ---
-          chk(so64[0x85e334:0x85e338] == bytes.fromhex('800500b4'), 'b18 arm64 guard cbz после DG')
-          chk(so64[0x85e33c:0x85e340] == bytes.fromhex('01000090'), 'b18 arm64 adrp x1 = "UnityEngine.UI"')
-          chk(so64[0x85e344:0x85e348] == bytes.fromhex('e00315aa'), 'b18 arm64 mov x0,x21 (домен в x0)')
-          chk(so64[0x85e34c:0x85e350] == bytes.fromhex('c00400b4'), 'b18 arm64 guard cbz после DAO')
-          chk(so64[0x85e36c:0x85e370] == bytes.fromhex('c00300b4'), 'b18 arm64 guard cbz после CFN')
-          chk(so32[0x1c6a3e0:0x1c6a3e4] == bytes.fromhex('01108fe0'), 'b18 arm32 add r1,pc (строка UI из пула)')
-          chk(so32[0x1c6a3e4:0x1c6a3e8] == bytes.fromhex('dfad9eeb'), 'b18 arm32 bl DAO')
-          chk(so32[0x1c6a3d4:0x1c6a3d8] == bytes.fromhex('000050e3'), 'b18 arm32 guard cmp r0,#0 после DG')
+          # --- b19: фикс краша set_text (GetComponent перед установкой текста) ---
+          chk(so64[0x85e324:0x85e328] == bytes.fromhex('ff0b00f9'), 'b19 arm64 Type-scratch = NULL (init)')
+          chk(so64[0x85e334:0x85e338] == bytes.fromhex('4f75fa97'), 'b19 arm64 bl DG')
+          chk(so64[0x85e380:0x85e384] == bytes.fromhex('e00b00f9'), 'b19 arm64 Type -> [sp+0x10]')
+          chk(so64[0x85e398:0x85e39c] == bytes.fromhex('e10b40f9'), 'b19 arm64 Type -> GetComponent (CH)')
+          chk(so64[0x85e444:0x85e448] == bytes.fromhex('f70300aa'), 'b19 arm64 mov x23,x0 (GO BtcPop)')
+          chk(so64[0x85e448:0x85e44c] == bytes.fromhex('e00b40f9'), 'b19 arm64 ldr Type,[sp+0x10]')
+          chk(so64[0x85e450:0x85e454] == bytes.fromhex('e10317aa'), 'b19 arm64 mov x1,x23 (GetComponent(GO,Type))')
+          chk(so64[0x85e460:0x85e464] == bytes.fromhex('cbb94494'), 'b19 arm64 bl set_text (x0=Text)')
+          chk(so32[0x1c6a3d0:0x1c6a3d4] == bytes.fromhex('08d04de2'), 'b19 arm32 sub sp,#8 (scratch)')
+          chk(so32[0x1c6a3dc:0x1c6a3e0] == bytes.fromhex('e0ad9eeb'), 'b19 arm32 bl DG')
+          chk(so32[0x1c6a528:0x1c6a52c] == bytes.fromhex('0010a0e1'), 'b19 arm32 mov r1,r0 (GO)')
+          chk(so32[0x1c6a52c:0x1c6a530] == bytes.fromhex('00009de5'), 'b19 arm32 ldr r0,[sp] (Type)')
 
           # --- b17: бандл (гирлянда, снег на столе, BtcPop) и ресурс ---
           want = open('mod/bundle_b17.sha256').read().strip()
@@ -195,11 +199,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="v1.9.1.11-uranium.b18"
+          TAG="v1.9.1.11-uranium.b19"
           DATE=$(date +'%Y.%m.%d-%H%M')
           NOTES="Мод Blue PC Simulator: Uranium PC Simulator. Сборка $DATE.
 
-          Изменения b18 (ЭКСТРЕННЫЙ ФИКС КРАША ПРИ ЗАПУСКЕ, SIGSEGV):
+          Изменения b19 (ФИКС КРАША «+N BTC», SIGSEGV fault 0x8):
+          - ПРИЧИНА: в ветке показа «+N BTC» текст ставился прямо в GameObject
+            из Find("BtcPop") вместо Text-компонента (Text.set_text читал
+            vtable чужого класса -> вызов по мусорному указателю)
+          - ИСПРАВЛЕНО: Find("BtpPop") -> GetComponent(go, typeof(Text)) ->
+            set_text; Type(Text) сохраняется на стеке кадра
+          - ИСПРАВЛЕНО: если Text не резолвится/не найден — показ просто
+            пропускается, без краша
+          - arm32: пул кейва перенесён (0x1c6a588 -> 0x1c6a800), строки не сдвинуты
+
+          Изменения b18 (фикс краша при запуске, SIGSEGV):
           - ПРИЧИНА: в кейве b17 (покраска кнопки CH) на arm64 в вызов
             DomainAssemblyOpen передавался мусор вместо имени сборки —
             AssemblyGetImage читал нулевой указатель -> «Fatal signal 11
